@@ -4,6 +4,7 @@ import { supabasePublic } from "@/lib/supabase-public";
 
 type PublicRecipe = {
   title: string;
+  category: string | null;
   description: string | null;
   photo_path: string | null;
   recipe_ingredients: {
@@ -27,7 +28,7 @@ export default async function SharedRecipePage({
   const { data, error } = await supabasePublic
     .from("recipes")
     .select(
-      "title,description,photo_path,recipe_ingredients(name,amount,position),recipe_steps(instruction,position)"
+      "title,category,description,photo_path,recipe_ingredients(name,amount,position),recipe_steps(instruction,position)"
     )
     .eq("share_slug", params.slug)
     .eq("is_public", true)
@@ -61,6 +62,7 @@ export default async function SharedRecipePage({
             Recipe Keeper
           </div>
           <h1>{recipe.title}</h1>
+          {recipe.category ? <span className="category-pill">{recipe.category}</span> : null}
           {recipe.description ? <p className="public-description">{recipe.description}</p> : null}
 
           <div className="public-grid">

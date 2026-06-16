@@ -2,6 +2,9 @@ alter table public.recipes
 add column if not exists is_public boolean not null default false;
 
 alter table public.recipes
+add column if not exists category text;
+
+alter table public.recipes
 add column if not exists share_slug text unique;
 
 create index if not exists recipes_share_slug_idx on public.recipes(share_slug);

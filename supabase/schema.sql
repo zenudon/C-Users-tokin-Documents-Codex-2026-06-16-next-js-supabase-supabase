@@ -4,6 +4,7 @@ create table if not exists public.recipes (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   title text not null,
+  category text,
   description text,
   photo_path text,
   is_public boolean not null default false,

@@ -32,6 +32,7 @@ type Step = {
 type Recipe = {
   id: string;
   title: string;
+  category: string | null;
   description: string | null;
   photo_path: string | null;
   is_public: boolean;
@@ -44,6 +45,7 @@ type Recipe = {
 type Draft = {
   id?: string;
   title: string;
+  category: string;
   description: string;
   photo_path: string | null;
   is_public: boolean;
@@ -55,6 +57,7 @@ type Draft = {
 function createEmptyDraft(): Draft {
   return {
     title: "",
+    category: "",
     description: "",
     photo_path: null,
     is_public: false,
@@ -114,7 +117,7 @@ export function RecipeApp() {
       const ingredientText = recipe.recipe_ingredients
         .map((ingredient) => ingredient.name)
         .join(" ");
-      return `${recipe.title} ${recipe.description ?? ""} ${ingredientText}`
+      return `${recipe.title} ${recipe.category ?? ""} ${recipe.description ?? ""} ${ingredientText}`
         .toLowerCase()
         .includes(text);
     });
@@ -127,7 +130,7 @@ export function RecipeApp() {
     const { data, error } = await supabase
       .from("recipes")
       .select(
-        "id,title,description,photo_path,is_public,share_slug,created_at,recipe_ingredients(id,name,amount,position),recipe_steps(id,instruction,position)"
+        "id,title,category,description,photo_path,is_public,share_slug,created_at,recipe_ingredients(id,name,amount,position),recipe_steps(id,instruction,position)"
       )
       .order("created_at", { ascending: false })
       .order("position", { referencedTable: "recipe_ingredients" })
@@ -188,6 +191,7 @@ export function RecipeApp() {
     setDraft({
       id: recipe.id,
       title: recipe.title,
+      category: recipe.category ?? "",
       description: recipe.description ?? "",
       photo_path: recipe.photo_path,
       is_public: recipe.is_public,
@@ -230,6 +234,7 @@ export function RecipeApp() {
     setStatus("保存中...");
     const basePayload = {
       title: draft.title.trim(),
+      category: draft.category.trim() || null,
       description: draft.description.trim() || null,
       is_public: draft.is_public,
       share_slug: draft.share_slug ?? makeShareSlug(),
@@ -444,6 +449,7 @@ export function RecipeApp() {
                 )}
                 <div>
                   <strong>{recipe.title}</strong>
+                  {recipe.category ? <span className="category-pill">{recipe.category}</span> : null}
                   <p className="muted">
                     {recipe.recipe_ingredients.length} 材料
                     {recipe.is_public ? " / 公開中" : ""}
@@ -545,6 +551,15 @@ function RecipeEditor({
             value={draft.title}
             onChange={(event) => onDraftChange({ ...draft, title: event.target.value })}
             placeholder="例: 週末のチキンカレー"
+          />
+        </label>
+
+        <label>
+          カテゴリー
+          <input
+            value={draft.category}
+            onChange={(event) => onDraftChange({ ...draft, category: event.target.value })}
+            placeholder="例: 主食、肉料理、麺、デザート"
           />
         </label>
 
