@@ -81,6 +81,7 @@ export function RecipeApp() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(true);
+  const [editorKey, setEditorKey] = useState(0);
   const editorRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -176,6 +177,7 @@ export function RecipeApp() {
   function startNew() {
     setSelectedId(null);
     setDraft(createEmptyDraft());
+    setEditorKey((current) => current + 1);
     setStatus("");
     window.setTimeout(() => {
       editorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -404,6 +406,10 @@ export function RecipeApp() {
             <Plus size={18} />
           </button>
         </div>
+        <button className="new-recipe-button" onClick={startNew} type="button">
+          <Plus size={16} />
+          新しいレシピを作る
+        </button>
 
         <div className="recipe-list">
           {filteredRecipes.map((recipe) => {
@@ -445,6 +451,7 @@ export function RecipeApp() {
         </div>
 
         <RecipeEditor
+          key={editorKey}
           draft={draft}
           photoUrl={selectedPhotoUrl}
           status={status}
