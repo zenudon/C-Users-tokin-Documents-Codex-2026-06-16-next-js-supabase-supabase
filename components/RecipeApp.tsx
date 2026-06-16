@@ -170,7 +170,6 @@ export function RecipeApp() {
 
   async function signOut() {
     if (!supabase) return;
-
     await supabase.auth.signOut();
   }
 
@@ -313,6 +312,14 @@ export function RecipeApp() {
     setStatus("削除しました。");
   }
 
+  async function copyAllPublicRecipesUrl() {
+    if (!user) return;
+
+    const url = `${window.location.origin}/u/${user.id}`;
+    await navigator.clipboard.writeText(url);
+    setStatus("公開レシピ一覧のリンクをコピーしました。");
+  }
+
   function photoUrl(path: string | null) {
     if (!supabase || !path) return null;
     return supabase.storage.from("recipe-photos").getPublicUrl(path).data.publicUrl;
@@ -365,10 +372,10 @@ export function RecipeApp() {
             />
           </label>
           <div className="auth-actions">
-            <button className="primary-button" onClick={signIn}>
+            <button className="primary-button" onClick={signIn} type="button">
               ログイン
             </button>
-            <button className="ghost-button" onClick={signUp}>
+            <button className="ghost-button" onClick={signUp} type="button">
               アカウント作成
             </button>
           </div>
@@ -388,7 +395,7 @@ export function RecipeApp() {
             <h1>Recipe Keeper</h1>
             <p className="muted">{user.email}</p>
           </div>
-          <button className="icon-button" title="ログアウト" onClick={signOut}>
+          <button className="icon-button" title="ログアウト" onClick={signOut} type="button">
             <LogOut size={18} />
           </button>
         </div>
@@ -406,9 +413,15 @@ export function RecipeApp() {
             <Plus size={18} />
           </button>
         </div>
+
         <button className="new-recipe-button" onClick={startNew} type="button">
           <Plus size={16} />
           新しいレシピを作る
+        </button>
+
+        <button className="share-list-button" onClick={copyAllPublicRecipesUrl} type="button">
+          <Share2 size={16} />
+          公開レシピ一覧を共有
         </button>
 
         <div className="recipe-list">
@@ -419,6 +432,7 @@ export function RecipeApp() {
                 key={recipe.id}
                 className={`recipe-row ${recipe.id === selectedId ? "active" : ""}`}
                 onClick={() => openRecipe(recipe)}
+                type="button"
               >
                 {url ? (
                   // eslint-disable-next-line @next/next/no-img-element

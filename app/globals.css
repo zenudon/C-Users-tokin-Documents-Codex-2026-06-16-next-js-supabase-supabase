@@ -129,6 +129,20 @@ h1 {
   margin: 0 0 16px;
 }
 
+.share-list-button {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+
 .recipe-row {
   width: 100%;
   text-align: left;
@@ -439,6 +453,73 @@ textarea {
   gap: 12px;
   padding-left: 24px;
   line-height: 1.65;
+}
+
+.public-list-header {
+  max-width: 1040px;
+  margin: 0 auto 22px;
+}
+
+.public-list-header h1 {
+  font-size: 38px;
+  line-height: 1.1;
+  margin-bottom: 10px;
+}
+
+.public-list-header p {
+  color: var(--muted);
+}
+
+.public-card-grid {
+  max-width: 1040px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.public-card {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  text-decoration: none;
+  box-shadow: var(--shadow);
+}
+
+.public-card img,
+.public-card-empty {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: #eadfce;
+}
+
+.public-card-empty {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+
+.public-card div:last-child {
+  padding: 16px;
+}
+
+.public-card h2 {
+  font-size: 20px;
+  margin: 0 0 8px;
+}
+
+.public-card p {
+  color: var(--muted);
+  line-height: 1.55;
+  margin-bottom: 12px;
+}
+
+.public-card span {
+  color: var(--brand);
+  font-weight: 700;
 }
 
 @media (max-width: 860px) {
