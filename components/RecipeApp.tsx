@@ -47,13 +47,15 @@ type Draft = {
   steps: Step[];
 };
 
-const emptyDraft: Draft = {
-  title: "",
-  description: "",
-  photo_path: null,
-  ingredients: [{ name: "", amount: "", position: 0 }],
-  steps: [{ instruction: "", position: 0 }]
-};
+function createEmptyDraft(): Draft {
+  return {
+    title: "",
+    description: "",
+    photo_path: null,
+    ingredients: [{ name: "", amount: "", position: 0 }],
+    steps: [{ instruction: "", position: 0 }]
+  };
+}
 
 export function RecipeApp() {
   const [user, setUser] = useState<User | null>(null);
@@ -61,12 +63,11 @@ export function RecipeApp() {
   const [password, setPassword] = useState("");
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [draft, setDraft] = useState<Draft>(emptyDraft);
+  const [draft, setDraft] = useState<Draft>(createEmptyDraft);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(true);
   const editorRef = useRef<HTMLElement | null>(null);
-  const didAutoSelectRecipe = useRef(false);
 
   useEffect(() => {
     if (!supabase) {
@@ -123,12 +124,8 @@ export function RecipeApp() {
     }
 
     setRecipes((data ?? []) as Recipe[]);
-    if (!didAutoSelectRecipe.current && !selectedId && data?.[0]) {
-      didAutoSelectRecipe.current = true;
-      openRecipe(data[0] as Recipe);
-    }
     setStatus("");
-  }, [selectedId]);
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -136,8 +133,7 @@ export function RecipeApp() {
     } else {
       setRecipes([]);
       setSelectedId(null);
-      setDraft(emptyDraft);
-      didAutoSelectRecipe.current = false;
+      setDraft(createEmptyDraft());
     }
   }, [loadRecipes, user]);
 
@@ -165,7 +161,7 @@ export function RecipeApp() {
 
   function startNew() {
     setSelectedId(null);
-    setDraft(emptyDraft);
+    setDraft(createEmptyDraft());
     setStatus("");
     window.setTimeout(() => {
       editorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
