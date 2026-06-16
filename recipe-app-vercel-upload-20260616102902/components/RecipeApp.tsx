@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import {
   BookOpen,
@@ -65,6 +65,7 @@ export function RecipeApp() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(true);
+  const editorRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (!supabase) {
@@ -162,6 +163,10 @@ export function RecipeApp() {
   function startNew() {
     setSelectedId(null);
     setDraft(emptyDraft);
+    setStatus("");
+    window.setTimeout(() => {
+      editorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
   }
 
   function openRecipe(recipe: Recipe) {
@@ -374,7 +379,7 @@ export function RecipeApp() {
               onChange={(event) => setQuery(event.target.value)}
             />
           </div>
-          <button className="icon-button" title="新規作成" onClick={startNew}>
+          <button className="icon-button" title="新規作成" onClick={startNew} type="button">
             <Plus size={18} />
           </button>
         </div>
@@ -406,7 +411,7 @@ export function RecipeApp() {
         </div>
       </aside>
 
-      <section className="recipe-main">
+      <section className="recipe-main" ref={editorRef}>
         <div className="topbar">
           <div>
             <h2>{selectedRecipe ? "レシピ編集" : "新しいレシピ"}</h2>
