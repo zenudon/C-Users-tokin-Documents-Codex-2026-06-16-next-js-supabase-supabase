@@ -115,6 +115,20 @@ h1 {
   gap: 10px;
 }
 
+.new-recipe-button {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--brand);
+  border-radius: 8px;
+  background: var(--brand);
+  color: white;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+
 .recipe-row {
   width: 100%;
   text-align: left;
