@@ -6,6 +6,8 @@ create table if not exists public.recipes (
   title text not null,
   description text,
   photo_path text,
+  is_public boolean not null default false,
+  share_slug text unique,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -26,6 +28,7 @@ create table if not exists public.recipe_steps (
 );
 
 create index if not exists recipes_user_id_idx on public.recipes(user_id);
+create index if not exists recipes_share_slug_idx on public.recipes(share_slug);
 create index if not exists recipe_ingredients_recipe_id_idx on public.recipe_ingredients(recipe_id);
 create index if not exists recipe_steps_recipe_id_idx on public.recipe_steps(recipe_id);
 
@@ -55,6 +58,12 @@ for all
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
 
+drop policy if exists "Anyone can view public recipes" on public.recipes;
+create policy "Anyone can view public recipes"
+on public.recipes
+for select
+using (is_public = true);
+
 drop policy if exists "Users can manage ingredients of own recipes" on public.recipe_ingredients;
 create policy "Users can manage ingredients of own recipes"
 on public.recipe_ingredients
@@ -76,6 +85,19 @@ with check (
   )
 );
 
+drop policy if exists "Anyone can view ingredients of public recipes" on public.recipe_ingredients;
+create policy "Anyone can view ingredients of public recipes"
+on public.recipe_ingredients
+for select
+using (
+  exists (
+    select 1
+    from public.recipes
+    where recipes.id = recipe_ingredients.recipe_id
+      and recipes.is_public = true
+  )
+);
+
 drop policy if exists "Users can manage steps of own recipes" on public.recipe_steps;
 create policy "Users can manage steps of own recipes"
 on public.recipe_steps
@@ -94,6 +116,19 @@ with check (
     from public.recipes
     where recipes.id = recipe_steps.recipe_id
       and recipes.user_id = auth.uid()
+  )
+);
+
+drop policy if exists "Anyone can view steps of public recipes" on public.recipe_steps;
+create policy "Anyone can view steps of public recipes"
+on public.recipe_steps
+for select
+using (
+  exists (
+    select 1
+    from public.recipes
+    where recipes.id = recipe_steps.recipe_id
+      and recipes.is_public = true
   )
 );
 

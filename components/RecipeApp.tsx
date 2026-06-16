@@ -10,6 +10,7 @@ import {
   Plus,
   Save,
   Search,
+  Share2,
   Trash2,
   X
 } from "lucide-react";
@@ -33,6 +34,8 @@ type Recipe = {
   title: string;
   description: string | null;
   photo_path: string | null;
+  is_public: boolean;
+  share_slug: string | null;
   created_at: string;
   recipe_ingredients: Ingredient[];
   recipe_steps: Step[];
@@ -43,6 +46,8 @@ type Draft = {
   title: string;
   description: string;
   photo_path: string | null;
+  is_public: boolean;
+  share_slug: string | null;
   ingredients: Ingredient[];
   steps: Step[];
 };
@@ -52,9 +57,18 @@ function createEmptyDraft(): Draft {
     title: "",
     description: "",
     photo_path: null,
+    is_public: false,
+    share_slug: null,
     ingredients: [{ name: "", amount: "", position: 0 }],
     steps: [{ instruction: "", position: 0 }]
   };
+}
+
+function makeShareSlug() {
+  const randomPart = Array.from(crypto.getRandomValues(new Uint8Array(6)))
+    .map((value) => value.toString(36))
+    .join("");
+  return `${Date.now().toString(36)}-${randomPart}`;
 }
 
 export function RecipeApp() {
@@ -112,7 +126,7 @@ export function RecipeApp() {
     const { data, error } = await supabase
       .from("recipes")
       .select(
-        "id,title,description,photo_path,created_at,recipe_ingredients(id,name,amount,position),recipe_steps(id,instruction,position)"
+        "id,title,description,photo_path,is_public,share_slug,created_at,recipe_ingredients(id,name,amount,position),recipe_steps(id,instruction,position)"
       )
       .order("created_at", { ascending: false })
       .order("position", { referencedTable: "recipe_ingredients" })
@@ -150,7 +164,7 @@ export function RecipeApp() {
 
     setStatus("アカウント作成中...");
     const { error } = await supabase.auth.signUp({ email, password });
-    setStatus(error ? error.message : "確認メールが必要な場合はメールを確認してください。");
+    setStatus(error ? error.message : "アカウントを作成しました。ログインしてください。");
   }
 
   async function signOut() {
@@ -175,6 +189,8 @@ export function RecipeApp() {
       title: recipe.title,
       description: recipe.description ?? "",
       photo_path: recipe.photo_path,
+      is_public: recipe.is_public,
+      share_slug: recipe.share_slug,
       ingredients:
         recipe.recipe_ingredients.length > 0
           ? recipe.recipe_ingredients
@@ -184,11 +200,13 @@ export function RecipeApp() {
           ? recipe.recipe_steps
           : [{ instruction: "", position: 0 }]
     });
+    window.setTimeout(() => {
+      editorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
   }
 
   async function uploadPhoto(recipeId: string, file: File) {
-    if (!supabase) return null;
-    if (!user) return null;
+    if (!supabase || !user) return null;
 
     const extension = file.name.split(".").pop() ?? "jpg";
     const path = `${user.id}/${recipeId}/main.${extension}`;
@@ -212,6 +230,8 @@ export function RecipeApp() {
     const basePayload = {
       title: draft.title.trim(),
       description: draft.description.trim() || null,
+      is_public: draft.is_public,
+      share_slug: draft.share_slug ?? makeShareSlug(),
       user_id: user.id
     };
 
@@ -220,12 +240,12 @@ export function RecipeApp() {
           .from("recipes")
           .update(basePayload)
           .eq("id", draft.id)
-          .select("id")
+          .select("id,share_slug")
           .single()
       : await supabase
           .from("recipes")
           .insert(basePayload)
-          .select("id")
+          .select("id,share_slug")
           .single();
 
     if (error || !recipe) {
@@ -264,7 +284,12 @@ export function RecipeApp() {
       if (steps.length) await supabase.from("recipe_steps").insert(steps);
 
       setSelectedId(recipe.id);
-      setDraft((current) => ({ ...current, id: recipe.id, photo_path: photoPath }));
+      setDraft((current) => ({
+        ...current,
+        id: recipe.id,
+        photo_path: photoPath,
+        share_slug: recipe.share_slug ?? current.share_slug
+      }));
       await loadRecipes();
       setStatus("保存しました。");
     } catch (saveError) {
@@ -273,9 +298,8 @@ export function RecipeApp() {
   }
 
   async function deleteRecipe() {
-    if (!supabase) return;
+    if (!supabase || !draft.id) return;
 
-    if (!draft.id) return;
     setStatus("削除中...");
     const { error } = await supabase.from("recipes").delete().eq("id", draft.id);
     if (error) {
@@ -288,9 +312,7 @@ export function RecipeApp() {
   }
 
   function photoUrl(path: string | null) {
-    if (!supabase) return null;
-
-    if (!path) return null;
+    if (!supabase || !path) return null;
     return supabase.storage.from("recipe-photos").getPublicUrl(path).data.publicUrl;
   }
 
@@ -310,7 +332,7 @@ export function RecipeApp() {
             <ChefHat size={24} />
           </div>
         </div>
-        <p className="muted">`.env.local` に Supabase URL と anon key を設定してください。</p>
+        <p className="muted">.env.local に Supabase URL と anon key を設定してください。</p>
       </main>
     );
   }
@@ -402,7 +424,10 @@ export function RecipeApp() {
                 )}
                 <div>
                   <strong>{recipe.title}</strong>
-                  <p className="muted">{recipe.recipe_ingredients.length} 材料</p>
+                  <p className="muted">
+                    {recipe.recipe_ingredients.length} 材料
+                    {recipe.is_public ? " / 公開中" : ""}
+                  </p>
                 </div>
               </button>
             );
@@ -426,6 +451,7 @@ export function RecipeApp() {
           onDraftChange={setDraft}
           onSave={saveRecipe}
           onDelete={deleteRecipe}
+          onStatus={setStatus}
         />
       </section>
     </main>
@@ -438,7 +464,8 @@ function RecipeEditor({
   status,
   onDraftChange,
   onSave,
-  onDelete
+  onDelete,
+  onStatus
 }: {
   draft: Draft;
   photoUrl: string | null;
@@ -446,8 +473,14 @@ function RecipeEditor({
   onDraftChange: (draft: Draft) => void;
   onSave: (photoFile?: File) => void;
   onDelete: () => void;
+  onStatus: (message: string) => void;
 }) {
   const [photoFile, setPhotoFile] = useState<File | undefined>();
+  const preview = photoFile ? URL.createObjectURL(photoFile) : photoUrl;
+  const shareUrl =
+    typeof window !== "undefined" && draft.share_slug
+      ? `${window.location.origin}/r/${draft.share_slug}`
+      : "";
 
   function updateIngredient(index: number, field: keyof Ingredient, value: string) {
     const ingredients = draft.ingredients.map((ingredient, currentIndex) =>
@@ -463,7 +496,15 @@ function RecipeEditor({
     onDraftChange({ ...draft, steps });
   }
 
-  const preview = photoFile ? URL.createObjectURL(photoFile) : photoUrl;
+  async function copyShareUrl() {
+    if (!shareUrl) {
+      onStatus("一度保存すると共有リンクをコピーできます。");
+      return;
+    }
+
+    await navigator.clipboard.writeText(shareUrl);
+    onStatus("共有リンクをコピーしました。");
+  }
 
   return (
     <div className="editor">
@@ -506,6 +547,32 @@ function RecipeEditor({
           />
         </label>
 
+        <div className="share-panel">
+          <label className="toggle-row">
+            <input
+              type="checkbox"
+              checked={draft.is_public}
+              onChange={(event) =>
+                onDraftChange({
+                  ...draft,
+                  is_public: event.target.checked,
+                  share_slug: draft.share_slug ?? makeShareSlug()
+                })
+              }
+            />
+            公開リンクで共有する
+          </label>
+          {draft.is_public ? (
+            <div className="share-actions">
+              <input value={shareUrl || "保存後にリンクが作られます"} readOnly />
+              <button className="ghost-button" onClick={copyShareUrl} type="button">
+                <Share2 size={16} />
+                コピー
+              </button>
+            </div>
+          ) : null}
+        </div>
+
         <div className="grid-two">
           <section className="stack">
             <h3>材料</h3>
@@ -530,6 +597,7 @@ function RecipeEditor({
                       ingredients: draft.ingredients.filter((_, currentIndex) => currentIndex !== index)
                     })
                   }
+                  type="button"
                 >
                   <X size={16} />
                 </button>
@@ -546,6 +614,7 @@ function RecipeEditor({
                   ]
                 })
               }
+              type="button"
             >
               <Plus size={16} />
               材料を追加
@@ -570,6 +639,7 @@ function RecipeEditor({
                       steps: draft.steps.filter((_, currentIndex) => currentIndex !== index)
                     })
                   }
+                  type="button"
                 >
                   <X size={16} />
                 </button>
@@ -583,6 +653,7 @@ function RecipeEditor({
                   steps: [...draft.steps, { instruction: "", position: draft.steps.length }]
                 })
               }
+              type="button"
             >
               <Plus size={16} />
               手順を追加
@@ -592,12 +663,12 @@ function RecipeEditor({
 
         <div className="form-actions">
           <div>
-            <button className="primary-button" onClick={() => onSave(photoFile)}>
+            <button className="primary-button" onClick={() => onSave(photoFile)} type="button">
               <Save size={17} />
               保存
             </button>
             {draft.id ? (
-              <button className="danger-button" onClick={onDelete} style={{ marginLeft: 10 }}>
+              <button className="danger-button" onClick={onDelete} style={{ marginLeft: 10 }} type="button">
                 <Trash2 size={17} />
                 削除
               </button>
