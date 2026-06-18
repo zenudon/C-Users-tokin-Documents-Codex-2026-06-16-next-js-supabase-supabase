@@ -54,6 +54,8 @@ type Draft = {
   steps: Step[];
 };
 
+const CATEGORY_OPTIONS = ["うどん", "ZEN", "アイス", "たれ", "ソース"];
+
 function createEmptyDraft(): Draft {
   return {
     title: "",
@@ -565,11 +567,17 @@ function RecipeEditor({
 
         <label>
           カテゴリー
-          <input
+          <select
             value={draft.category}
             onChange={(event) => onDraftChange({ ...draft, category: event.target.value })}
-            placeholder="例: 主食、肉料理、麺、デザート"
-          />
+          >
+            <option value="">選択してください</option>
+            {CATEGORY_OPTIONS.map((category) => (
+              <option value={category} key={category}>
+                {category}
+              </option>
+            ))}
+          </select>
         </label>
 
         <label>

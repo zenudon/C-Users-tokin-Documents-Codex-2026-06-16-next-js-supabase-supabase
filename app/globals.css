@@ -28,6 +28,7 @@ body {
 
 button,
 input,
+select,
 textarea {
   font: inherit;
 }
@@ -247,6 +248,7 @@ label {
 }
 
 input,
+select,
 textarea {
   width: 100%;
   border: 1px solid var(--line);
@@ -503,6 +505,28 @@ textarea {
   background: white;
 }
 
+.category-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.category-filter {
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: white;
+  color: var(--text);
+  padding: 0 14px;
+}
+
+.category-filter.active {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: white;
+}
+
 .public-card {
   overflow: hidden;
   border: 1px solid var(--line);
@@ -511,6 +535,30 @@ textarea {
   color: var(--text);
   text-decoration: none;
   box-shadow: var(--shadow);
+}
+
+.category-card {
+  border-top: 6px solid var(--brand);
+}
+
+.category-うどん {
+  border-top-color: #2f6f73;
+}
+
+.category-ZEN {
+  border-top-color: #6f5aa8;
+}
+
+.category-アイス {
+  border-top-color: #4d8fb8;
+}
+
+.category-たれ {
+  border-top-color: #bd6333;
+}
+
+.category-ソース {
+  border-top-color: #8a4f3d;
 }
 
 .public-card img,
