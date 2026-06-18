@@ -36,7 +36,7 @@ export function PublicRecipeSearch({
     <section className="public-list-content">
       <input
         className="public-search"
-        placeholder="レシピ名・材料で検索"
+        placeholder="レシピ名・カテゴリー・材料で検索"
         value={query}
         onChange={(event) => setQuery(event.target.value)}
       />

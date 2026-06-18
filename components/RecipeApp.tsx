@@ -325,6 +325,10 @@ export function RecipeApp() {
     setStatus("公開レシピ一覧のリンクをコピーしました。");
   }
 
+  function openEveryonePublicRecipes() {
+    window.open(`${window.location.origin}/public`, "_blank", "noopener,noreferrer");
+  }
+
   function photoUrl(path: string | null) {
     if (!supabase || !path) return null;
     return supabase.storage.from("recipe-photos").getPublicUrl(path).data.publicUrl;
@@ -427,6 +431,11 @@ export function RecipeApp() {
         <button className="share-list-button" onClick={copyAllPublicRecipesUrl} type="button">
           <Share2 size={16} />
           公開レシピ一覧を共有
+        </button>
+
+        <button className="share-list-button" onClick={openEveryonePublicRecipes} type="button">
+          <BookOpen size={16} />
+          みんなの公開レシピ
         </button>
 
         <div className="recipe-list">

@@ -13,18 +13,13 @@ type PublicRecipeCard = {
   recipe_ingredients: { name: string }[];
 };
 
-export default async function PublicRecipeListPage({
-  params
-}: {
-  params: { userId: string };
-}) {
+export default async function AllPublicRecipesPage() {
   if (!supabasePublic) notFound();
   const supabase = supabasePublic;
 
   const { data, error } = await supabase
     .from("recipes")
     .select("title,category,description,photo_path,share_slug,created_at,recipe_ingredients(name)")
-    .eq("user_id", params.userId)
     .eq("is_public", true)
     .not("share_slug", "is", null)
     .order("created_at", { ascending: false });
@@ -51,8 +46,8 @@ export default async function PublicRecipeListPage({
           <ChefHat size={18} />
           Recipe Keeper
         </div>
-        <h1>公開レシピ一覧</h1>
-        <p>このユーザーが公開しているレシピだけを表示しています。</p>
+        <h1>みんなの公開レシピ</h1>
+        <p>公開設定になっているすべてのレシピを表示しています。</p>
       </section>
 
       <PublicRecipeSearch recipes={recipes} />
