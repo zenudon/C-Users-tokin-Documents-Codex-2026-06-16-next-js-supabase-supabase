@@ -1,17 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import {
   BookOpen,
   Camera,
   ChefHat,
+  Download,
   LogOut,
   Plus,
   Save,
   Search,
   Share2,
   Trash2,
+  Upload,
   X
 } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
@@ -54,6 +56,32 @@ type Draft = {
   steps: Step[];
 };
 
+type BackupPhoto = {
+  file_name: string;
+  mime_type: string;
+  data_url: string;
+};
+
+type BackupRecipe = {
+  id: string;
+  title: string;
+  category: string | null;
+  description: string | null;
+  is_public: boolean;
+  share_slug: string | null;
+  created_at: string;
+  ingredients: Array<Pick<Ingredient, "name" | "amount" | "position">>;
+  steps: Array<Pick<Step, "instruction" | "position">>;
+  photo: BackupPhoto | null;
+};
+
+type RecipeBackup = {
+  app: "Recipe Keeper";
+  version: 1;
+  exported_at: string;
+  recipes: BackupRecipe[];
+};
+
 const CATEGORY_OPTIONS = ["うどん", "ZEN", "アイス", "たれ", "ソース"];
 
 function createEmptyDraft(): Draft {
@@ -76,6 +104,34 @@ function makeShareSlug() {
   return `${Date.now().toString(36)}-${randomPart}`;
 }
 
+function blobToDataUrl(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error ?? new Error("写真を読み込めませんでした。"));
+    reader.readAsDataURL(blob);
+  });
+}
+
+function dataUrlToBlob(dataUrl: string) {
+  const [header, encoded] = dataUrl.split(",", 2);
+  if (!header || !encoded) throw new Error("写真データの形式が正しくありません。");
+
+  const mimeType = /data:(.*?);base64/.exec(header)?.[1] ?? "application/octet-stream";
+  const binary = atob(encoded);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return new Blob([bytes], { type: mimeType });
+}
+
+function isRecipeBackup(value: unknown): value is RecipeBackup {
+  if (!value || typeof value !== "object") return false;
+  const backup = value as Partial<RecipeBackup>;
+  return backup.app === "Recipe Keeper" && backup.version === 1 && Array.isArray(backup.recipes);
+}
+
 export function RecipeApp() {
   const [user, setUser] = useState<User | null>(null);
   const [email, setEmail] = useState("");
@@ -86,8 +142,10 @@ export function RecipeApp() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(true);
+  const [backupBusy, setBackupBusy] = useState(false);
   const [editorKey, setEditorKey] = useState(0);
   const editorRef = useRef<HTMLElement | null>(null);
+  const backupInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!supabase) {
@@ -331,6 +389,182 @@ export function RecipeApp() {
     window.open(`${window.location.origin}/public`, "_blank", "noopener,noreferrer");
   }
 
+  async function exportBackup() {
+    if (!supabase || !user) return;
+
+    setBackupBusy(true);
+    setStatus("バックアップを作成中...");
+    let missingPhotos = 0;
+
+    try {
+      const backupRecipes: BackupRecipe[] = [];
+      for (const recipe of recipes) {
+        let photo: BackupPhoto | null = null;
+        if (recipe.photo_path) {
+          const { data, error } = await supabase.storage
+            .from("recipe-photos")
+            .download(recipe.photo_path);
+
+          if (error || !data) {
+            missingPhotos += 1;
+          } else {
+            photo = {
+              file_name: recipe.photo_path.split("/").pop() ?? "photo.jpg",
+              mime_type: data.type || "image/jpeg",
+              data_url: await blobToDataUrl(data)
+            };
+          }
+        }
+
+        backupRecipes.push({
+          id: recipe.id,
+          title: recipe.title,
+          category: recipe.category,
+          description: recipe.description,
+          is_public: recipe.is_public,
+          share_slug: recipe.share_slug,
+          created_at: recipe.created_at,
+          ingredients: recipe.recipe_ingredients.map(({ name, amount, position }) => ({
+            name,
+            amount,
+            position
+          })),
+          steps: recipe.recipe_steps.map(({ instruction, position }) => ({ instruction, position })),
+          photo
+        });
+      }
+
+      const backup: RecipeBackup = {
+        app: "Recipe Keeper",
+        version: 1,
+        exported_at: new Date().toISOString(),
+        recipes: backupRecipes
+      };
+      const blob = new Blob([JSON.stringify(backup)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `recipe-keeper-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+
+      setStatus(
+        missingPhotos > 0
+          ? `バックアップを保存しました。${missingPhotos}枚の写真は取得できませんでした。`
+          : `${backupRecipes.length}件のレシピと写真をバックアップしました。`
+      );
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "バックアップを作成できませんでした。");
+    } finally {
+      setBackupBusy(false);
+    }
+  }
+
+  async function importBackup(event: ChangeEvent<HTMLInputElement>) {
+    if (!supabase || !user) return;
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    setBackupBusy(true);
+    setStatus("バックアップを復元中...");
+    let restored = 0;
+
+    try {
+      const parsed: unknown = JSON.parse(await file.text());
+      if (!isRecipeBackup(parsed)) {
+        throw new Error("Recipe Keeperのバックアップファイルではありません。");
+      }
+
+      for (const recipe of parsed.recipes) {
+        if (!recipe.id || !recipe.title || !Array.isArray(recipe.ingredients) || !Array.isArray(recipe.steps)) {
+          throw new Error("バックアップ内のレシピデータが正しくありません。");
+        }
+
+        const { data: restoredRecipe, error } = await supabase
+          .from("recipes")
+          .upsert(
+            {
+              id: recipe.id,
+              title: recipe.title,
+              category: recipe.category,
+              description: recipe.description,
+              is_public: Boolean(recipe.is_public),
+              share_slug: recipe.share_slug ?? makeShareSlug(),
+              user_id: user.id
+            },
+            { onConflict: "id" }
+          )
+          .select("id")
+          .single();
+
+        if (error || !restoredRecipe) {
+          throw new Error(error?.message ?? `「${recipe.title}」を復元できませんでした。`);
+        }
+
+        await supabase.from("recipe_ingredients").delete().eq("recipe_id", restoredRecipe.id);
+        await supabase.from("recipe_steps").delete().eq("recipe_id", restoredRecipe.id);
+
+        const ingredients = recipe.ingredients
+          .filter((ingredient) => ingredient.name?.trim())
+          .map((ingredient, position) => ({
+            recipe_id: restoredRecipe.id,
+            name: ingredient.name.trim(),
+            amount: ingredient.amount?.trim() ?? "",
+            position
+          }));
+        const steps = recipe.steps
+          .filter((step) => step.instruction?.trim())
+          .map((step, position) => ({
+            recipe_id: restoredRecipe.id,
+            instruction: step.instruction.trim(),
+            position
+          }));
+
+        if (ingredients.length) {
+          const { error: ingredientError } = await supabase
+            .from("recipe_ingredients")
+            .insert(ingredients);
+          if (ingredientError) throw new Error(ingredientError.message);
+        }
+        if (steps.length) {
+          const { error: stepError } = await supabase.from("recipe_steps").insert(steps);
+          if (stepError) throw new Error(stepError.message);
+        }
+
+        if (recipe.photo?.data_url) {
+          const photoBlob = dataUrlToBlob(recipe.photo.data_url);
+          const extension =
+            recipe.photo.file_name.split(".").pop()?.replace(/[^a-zA-Z0-9]/g, "") || "jpg";
+          const photoPath = `${user.id}/${restoredRecipe.id}/main.${extension}`;
+          const { error: photoError } = await supabase.storage
+            .from("recipe-photos")
+            .upload(photoPath, photoBlob, {
+              upsert: true,
+              contentType: recipe.photo.mime_type || photoBlob.type
+            });
+          if (photoError) throw new Error(photoError.message);
+          const { error: photoUpdateError } = await supabase
+            .from("recipes")
+            .update({ photo_path: photoPath })
+            .eq("id", restoredRecipe.id);
+          if (photoUpdateError) throw new Error(photoUpdateError.message);
+        }
+
+        restored += 1;
+      }
+
+      await loadRecipes();
+      setStatus(`${restored}件のレシピを復元しました。`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "バックアップを復元できませんでした。");
+    } finally {
+      setBackupBusy(false);
+    }
+  }
+
   function photoUrl(path: string | null) {
     if (!supabase || !path) return null;
     return supabase.storage.from("recipe-photos").getPublicUrl(path).data.publicUrl;
@@ -439,6 +673,35 @@ export function RecipeApp() {
           <BookOpen size={16} />
           みんなの公開レシピ
         </button>
+
+        <div className="backup-actions">
+          <button
+            className="backup-button"
+            disabled={backupBusy}
+            onClick={exportBackup}
+            type="button"
+          >
+            <Download size={16} />
+            バックアップ保存
+          </button>
+          <button
+            className="backup-button"
+            disabled={backupBusy}
+            onClick={() => backupInputRef.current?.click()}
+            type="button"
+          >
+            <Upload size={16} />
+            バックアップ復元
+          </button>
+          <input
+            ref={backupInputRef}
+            className="visually-hidden"
+            type="file"
+            accept="application/json,.json"
+            onChange={importBackup}
+          />
+        </div>
+        <p className="sidebar-status" aria-live="polite">{status}</p>
 
         <div className="recipe-list">
           {filteredRecipes.map((recipe) => {
